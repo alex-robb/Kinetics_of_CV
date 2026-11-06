@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chemical Kinetics Analyzer (Student)</title>
+<style>
+:root{--navy:#12334a;--teal:#008b8b;--light:#f2f6f8;--border:#d7e0e5;--text:#243746}
+*{box-sizing:border-box}
+body{margin:0;padding:24px;background:var(--light);color:var(--text);font-family:Arial,sans-serif}
+.container{max-width:1450px;margin:auto}
+header{background:var(--navy);color:#fff;padding:25px;border-radius:10px;margin-bottom:22px}
+header h1{margin:0 0 8px}header p{margin:0;opacity:.9}
+.card{background:#fff;border:1px solid var(--border);border-radius:9px;padding:22px;margin-bottom:22px}
+h2,h3{color:var(--navy)}h2{margin-top:0}
+button{border:none;border-radius:6px;padding:11px 18px;font-size:15px;font-weight:bold;cursor:pointer;background:var(--teal);color:#fff;margin:4px}
+button:hover{filter:brightness(.9)}
+button.secondary{background:#e5edf1;color:var(--navy)}
+button.selected{background:var(--navy);outline:3px solid #9bc9d0}
+input[type=file]{padding:12px;border:1px dashed #91aab8;border-radius:6px;width:100%;max-width:500px}
+input[type=number],input[type=text],select{padding:8px;border:1px solid var(--border);border-radius:5px;width:125px}
+input[type=text]{width:190px}
+.row{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0}
+.row label{font-size:13px;font-weight:bold;display:flex;flex-direction:column;gap:4px}
+.status{margin-top:12px;font-weight:bold;color:var(--teal)}
+.small{font-size:13px;color:#647784}
+.warn{color:#b45309;font-weight:bold}
+.chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
+.chart-box{border:1px solid var(--border);padding:12px;border-radius:7px;min-width:0}
+canvas{width:100%;height:310px;display:block}
+canvas.short{height:140px}
+.chart-title{font-weight:bold;color:var(--navy);text-align:center;margin:6px 0}
+.chart-info{font-size:13px;text-align:center;line-height:1.7;margin:8px 0}
+.order-buttons{display:flex;flex-wrap:wrap;gap:8px;margin:15px 0}
+table{width:100%;border-collapse:collapse;margin-top:15px;font-size:14px}
+th,td{padding:10px;border:1px solid var(--border);text-align:center}
+th{background:var(--navy);color:#fff}
+tr:nth-child(even){background:#f5f8fa}
+.table-wrap{overflow-x:auto}
+.hidden{display:none}
+.trial-control{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px;border-bottom:1px solid var(--border)}
+.result{background:#edf5f5;border-left:4px solid var(--teal);padding:15px;margin-top:15px;line-height:1.8}
+.best{background:#d9efe9;font-weight:bold}
+@media(max-width:600px){body{padding:10px}.card{padding:14px}canvas{height:260px}canvas.short{height:130px}}
+@media print{button,input[type=file]{display:none}body{background:#fff}}
+#report{max-width:8in;margin:auto;background:#fff;padding:.4in;font-size:10.5pt;line-height:1.35}
+#report h1{font-size:16pt;margin:0 0 3pt}
+#report h2{font-size:12pt;margin:12pt 0 4pt;border-bottom:1.5px solid var(--navy);padding-bottom:2pt}
+#report table{font-size:9pt;margin:4pt 0}#report th,#report td{padding:3pt 5pt}
+#report .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#report .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+#report img{width:100%;display:block;border:1px solid var(--border)}
+#report .cap{font-size:8.5pt;text-align:center;margin:2pt 0 6pt}
+#report .sec{break-inside:avoid}
+#report .result{padding:8px;margin-top:6px;line-height:1.5}
+th,.best,.result{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+@media print{.container,.noprint{display:none!important}body{padding:0}#report{padding:0;max-width:none}@page{margin:.5in}}
+</style>
+</head>
+<body>
+<div class="container">
+<header><h1>Chemical Kinetics Analyzer (Student Version)</h1><p>Kinetics of Crystal Violet</p></header>
+
+<section class="card">
+<h2>1. Upload Experimental Data</h2>
+<p>Upload a Vernier-format .txt or .csv file containing multiple runs (Run 1, Run 2, …). Columns must be time then absorbance.</p>
+<input type="file" id="fileInput" accept=".txt,.csv">
+<div id="uploadStatus" class="status">No file uploaded.</div>
+<div class="row">
+<label>Student name<input type="text" id="stuName"></label>
+<label>Time units in file<select id="tUnit" onchange="refresh()"><option value="1">seconds</option><option value="60">minutes</option></select></label>
+<label>Fit start (s)<input type="number" id="tStart" step="any" min="0" onchange="refresh()"></label>
+<label>Fit end (s)<input type="number" id="tEnd" step="any" min="0" onchange="refresh()"></label>
+<label>Min absorbance<input type="number" id="minA" step="any" min="0" onchange="refresh()"></label>
+<label>ε·l (M⁻¹, optional)<input type="number" id="el" step="any" min="0" onchange="refresh()"></label>
+<label>[CV] (M, optional)<input type="number" id="cv" step="any" min="0" onchange="refresh()"></label>
+</div>
+<p class="small">Fit window: leave blank to use all data. Trim the mixing period at the start and noisy low-absorbance data at the end. ε·l converts zero- and second-order k from absorbance units to molar units; first-order k needs no conversion.</p>
+<div id="trialControls"></div>
+</section>
+
+<section class="card hidden" id="orderSection">
+<h2>2. Determine Reaction Order (with respect to crystal violet)</h2>
+<p>Choose a trial, then compare the linearity, R², and residuals of each plot. Residuals should scatter randomly around zero; a curved pattern means the order is wrong, even if R² is high.</p>
+<label class="small">Trial shown: <select id="trialSel" onchange="drawInitial()"></select></label>
+<div id="orderGrid" class="chart-grid" style="margin-top:14px"></div>
+<h3>R² for every included trial</h3>
+<div class="table-wrap" id="r2Table"></div>
+<h3>Select the reaction order:</h3>
+<div class="order-buttons" id="ordBtns"></div>
+<div id="orderStatus" class="small">Select an order to continue.</div>
+</section>
+
+<section class="card hidden" id="analysisSection">
+<h2>3. Individual Trial Analysis</h2>
+<p id="chosenOrder"></p>
+<div id="individualCharts" class="chart-grid"></div>
+<div id="cpK1" style="margin-top:14px"></div>
+</section>
+
+<section class="card hidden" id="resultsSection">
+<h2>4. Summary of Experimental Results</h2>
+<div class="table-wrap"><table><thead><tr><th>Trial</th><th>Slope</th><th>Intercept</th><th id="thK">k observed</th></tr></thead><tbody id="resultsTable"></tbody></table></div>
+</section>
+
+<section class="card hidden" id="hydroxideSection">
+<h2>5. Determine Reaction Order with Respect to OH⁻</h2>
+<p>Enter the hydroxide concentration used in each trial. A plot of ln(k observed) vs. ln[OH⁻] is drawn below. Use it to answer each question; a correct answer reveals the computed value and unlocks the next part.</p>
+<div class="table-wrap"><table><thead><tr><th>Trial</th><th>Include</th><th>[OH⁻] (M)</th><th id="thK2">k observed</th></tr></thead><tbody id="ohTable"></tbody></table></div>
+<div id="ohErr" class="warn" style="margin-top:8px"></div>
+<div id="cpOH"></div>
+<div id="ohResult" class="result hidden"></div>
+<div class="chart-box" style="margin-top:20px"><div class="chart-title">ln(k observed) vs. ln[OH⁻]</div><canvas id="ohChart"></canvas><div id="ohInfo" class="chart-info"></div></div>
+<div id="final" class="result hidden" style="margin-top:20px"><h3>Final Results</h3><div id="finalLaw"></div><div id="finalK" style="margin-top:8px"></div><div id="finalNote" class="small"></div></div>
+</section>
+
+<section class="card hidden" id="coldSection">
+<h2>6. Temperature Dependence and Activation Energy</h2>
+<p>Enter the absorbance of crystal violet measured at low temperature (every 60 s). The reaction order selected in Part 2 is used for the fit, and the room-temperature rate constant from Part 5 is the second point for the Arrhenius calculation. Edit the times if yours differ, and use "Add row" for extra readings.</p>
+<div class="row">
+<label>Low temperature (°C)<input type="number" id="tCold" step="any" value="0" onchange="resetCold()"></label>
+<label>Temperature of Parts 1–5 (°C)<input type="number" id="tRoom" step="any" placeholder="e.g. 22" onchange="resetCold()"></label>
+<label>[OH⁻] in low-temp run (M)<input type="number" id="ohCold" step="any" min="0" onchange="resetCold()"></label>
+</div>
+<div class="table-wrap"><table style="max-width:360px"><thead><tr><th>Time (s)</th><th>Absorbance</th></tr></thead><tbody id="coldTable"></tbody></table></div>
+<button class="secondary" onclick="addColdRow()">+ Add row</button>
+<button class="secondary" onclick="clearCold()">Reset table</button>
+<button onclick="calculateCold()">Calculate k and Eₐ</button>
+<div class="chart-grid" style="margin-top:16px"><div class="chart-box"><div class="chart-title">Low-temperature fit</div><canvas id="coldChart"></canvas><canvas id="coldRes" class="short"></canvas></div></div>
+<div id="coldResult" class="result hidden"></div>
+</section>
+
+<section class="card hidden" id="exportSection">
+<h2>7. Report</h2>
+<button onclick="showReport()">Generate Printable Report</button>
+</section>
+</div>
+<div id="report" class="hidden"></div>
+
+<script>
+const TOL={order:0.3,k:0.20,Ea:0.25}; // order: absolute; k and Ea: relative
+let answers=[];
+let trials=[],selOrder=null,results=[],ohRes=null,fileName="",chartArgs={};
+const $=id=>document.getElementById(id);
+const ORD=["Zero","First","Second"],KEYS=["zero","first","second"];
+const T95=[12.706,4.303,3.182,2.776,2.571,2.447,2.365,2.306,2.262,2.228,2.201,2.179,2.160,2.145,2.131,2.120,2.110,2.101,2.093,2.086,2.080,2.074,2.069,2.064,2.060,2.056,2.052,2.048,2.045,2.042];
+const tcrit=df=>df<1?NaN:df<=30?T95[df-1]:1.96;
+const avg=a=>a.reduce((s,v)=>s+v,0)/a.length;
+const num=id=>{const v=$(id).value;return v===""?null:Number(v)};
+const EL=()=>{const v=num("el");return v>0?v:0};
+const format=(v,d=6)=>Number.isFinite(v)?Number(v).toPrecision(d):"N/A";
+const pm=v=>format(v,5);
+const sci=(v,d=3)=>{if(!Number.isFinite(v))return"N/A";const[m,e]=v.toExponential(d-1).split("e");return m+" × 10<sup>"+String(Number(e)).replace("-","−")+"</sup>";};
+const sup=e=>(e===0||e===1)?"":"<sup>"+String(e).replace("-","−")+"</sup>";
+const axisLabel=o=>["Absorbance","ln(Absorbance)","1 / Absorbance"][o];
+
+$("orderGrid").innerHTML=KEYS.map((k,i)=>`<div class="chart-box"><div class="chart-title">${ORD[i]} Order</div><canvas id="${k}Chart"></canvas><div id="${k}Info" class="chart-info"></div><canvas id="${k}Res" class="short"></canvas></div>`).join("");
+$("ordBtns").innerHTML=ORD.map((n,i)=>`<button onclick="selectOrder(${i})">${n} Order</button>`).join("");
+
+// ---------- units ----------
+function units(order,conv,n){
+  const base=[1,0,-1][order],a=conv?0:base,m=(conv?base:0)-n;
+  let s="";if(m)s+="M"+sup(m)+"·";if(a)s+="AU"+sup(a)+"·";
+  return s+"s<sup>−1</sup>";
+}
+
+// ---------- file parsing ----------
+$("fileInput").addEventListener("change",e=>{
+  const f=e.target.files[0];if(!f)return;
+  fileName=f.name;const r=new FileReader();
+  r.onload=ev=>parseFile(ev.target.result);r.readAsText(f);
+});
+
+function parseFile(text){
+  trials=[];let cur=null,dropped=0;
+  text.split(/\r?\n/).forEach(line=>{
+    const m=line.match(/^\s*"?Run\s*#?\s*(\d+)/i);
+    if(m){
+      if(cur&&cur.data.length)trials.push(cur);
+      cur={name:"Trial "+m[1],number:+m[1],data:[],include:true,oh:""};return;
+    }
+    if(!cur)return;
+    const p=line.trim().split(line.includes("\t")?/\t+/:/[,; ]+/);
+    if(p.length<2||p[0]===""||p[1]==="")return;
+    const t=Number(p[0]),a=Number(p[1]);
+    if(!Number.isFinite(t)||!Number.isFinite(a))return; // header/unit lines
+    if(t<0||a<=0){dropped++;return;}
+    cur.data.push({t,a});
+  });
+  if(cur&&cur.data.length)trials.push(cur);
+  trials.forEach((t,i)=>{t.data.sort((a,b)=>a.t-b.t);t.oh="";});
+
+  selOrder=null;results=[];answers=[];resetOut();
+  document.querySelectorAll("#ordBtns button").forEach(b=>b.classList.remove("selected"));
+  $("orderStatus").textContent="Select an order to continue.";
+  ["analysisSection","resultsSection","hydroxideSection","coldSection","exportSection"].forEach(id=>$(id).classList.add("hidden"));
+
+  if(!trials.length){$("uploadStatus").textContent="No experimental runs were identified. Check the file format.";$("orderSection").classList.add("hidden");$("trialControls").innerHTML="";return;}
+  $("uploadStatus").textContent="Loaded "+trials.length+" trials with "+trials.reduce((s,t)=>s+t.data.length,0)+" data points."+(dropped?" Ignored "+dropped+" points with negative time or absorbance ≤ 0.":"");
+  renderTrialControls();fillSel();
+  $("orderSection").classList.remove("hidden");
+  drawInitial();
+}
+
+function renderTrialControls(){
+  const c=$("trialControls");c.innerHTML="<h3>Experimental Trials</h3>";
+  trials.forEach((tr,i)=>{
+    const d=document.createElement("div");d.className="trial-control";
+    d.innerHTML=`<input type="checkbox" id="inc${i}" ${tr.include?"checked":""}><label for="inc${i}"><b>${tr.name}</b></label><span class="small">${tr.data.length} data points</span>`;
+    d.querySelector("input").onchange=e=>{tr.include=e.target.checked;refresh();};
+    c.appendChild(d);
+  });
+  c.insertAdjacentHTML("beforeend",'<p class="small">Uncheck a trial to exclude it from subsequent calculations.</p>');
+}
+
+function fillSel(){
+  const s=$("trialSel"),prev=s.value,inc=trials.filter(t=>t.include);
+  s.innerHTML=inc.map(t=>`<option value="${t.number}">${t.name}</option>`).join("");
+  if(inc.some(t=>String(t.number)===prev))s.value=prev;
+}
+
+function refresh(){
+  if(!trials.length)return;
+  fillSel();selOrder=null;results=[];answers=[];resetOut();
+  ["analysisSection","resultsSection","hydroxideSection","coldSection","exportSection"].forEach(id=>$(id).classList.add("hidden"));
+  document.querySelectorAll("#ordBtns button").forEach(b=>b.classList.remove("selected"));
+  $("orderStatus").textContent="Settings changed: select an order to restart the analysis.";
+  drawInitial();
+}
+
+// ---------- math ----------
+function getData(tr){
+  const f=+$("tUnit").value,t0=num("tStart")??0,t1=num("tEnd")??Infinity,am=num("minA")??0;
+  return tr.data.map(p=>({t:p.t*f,a:p.a})).filter(p=>p.t>=t0&&p.t<=t1&&p.a>=am);
+}
+function transform(data,o){
+  return data.map(p=>({x:p.t,y:o===0?p.a:o===1?Math.log(p.a):1/p.a}));
+}
+function regression(pts){
+  const n=pts.length,bad={m:NaN,b:NaN,r2:NaN,n,seM:NaN,seB:NaN};
+  if(n<2)return bad;
+  const mx=avg(pts.map(p=>p.x)),my=avg(pts.map(p=>p.y));
+  let sxy=0,sxx=0,syy=0;
+  pts.forEach(p=>{sxy+=(p.x-mx)*(p.y-my);sxx+=(p.x-mx)**2;syy+=(p.y-my)**2;});
+  if(!sxx)return bad;
+  const m=sxy/sxx,b=my-m*mx;let ssr=0;
+  pts.forEach(p=>ssr+=(p.y-m*p.x-b)**2);
+  const s2=n>2?ssr/(n-2):NaN;
+  return{m,b,n,r2:syy?1-ssr/syy:1,seM:Math.sqrt(s2/sxx),seB:Math.sqrt(s2*(1/n+mx*mx/sxx))};
+}
+// observed k (and its SE) from the slope; converted to molar units if ε·l given
+function kCalc(m,se,o){
+  const el=EL(),f=o===2?(el||1):o===0?(el?1/el:1):1;
+  return{k:(o===2?1:-1)*m*f,se:se*f};
+}
+
+// ---------- Part 2 ----------
+function curTrial(){return trials.find(t=>String(t.number)===$("trialSel").value);}
+function drawInitial(){
+  const tr=curTrial();if(!tr)return;
+  const fmtInfo=r=>"y = "+format(r.m,4)+"x "+(r.b<0?"− ":"+ ")+format(Math.abs(r.b),4)+"<br>R² = "+format(r.r2,5);
+  [0,1,2].forEach(o=>{
+    const pts=transform(getData(tr),o),r=regression(pts);
+    drawChart(KEYS[o]+"Chart",pts,r,axisLabel(o),"Time (s)");
+    drawChart(KEYS[o]+"Res",pts.map(p=>({x:p.x,y:p.y-(r.m*p.x+r.b)})),{m:0,b:0},"Residual","Time (s)");
+    $(KEYS[o]+"Info").innerHTML=fmtInfo(r);
+  });
+  let h="<table><thead><tr><th>Trial</th><th>Zero R²</th><th>First R²</th><th>Second R²</th></tr></thead><tbody>";
+  trials.filter(t=>t.include).forEach(t=>{
+    const r2=[0,1,2].map(o=>regression(transform(getData(t),o)).r2),best=Math.max(...r2.filter(Number.isFinite));
+    h+="<tr><td>"+t.name+"</td>"+r2.map(v=>`<td>${Number.isFinite(v)?v.toFixed(3):"N/A"}</td>`).join("")+"</tr>";
+  });
+  $("r2Table").innerHTML=h+"</tbody></table><p class='small'>R² alone can be misleading; check the residual plots too.</p>";
+}
+
+function selectOrder(o){
+  const inc=trials.filter(t=>t.include);if(!inc.length||selOrder===o)return;
+  const avgR=[0,1,2].map(k=>avg(inc.map(t=>regression(transform(getData(t),k)).r2)));
+  const FIRST=1; // the expected answer is fixed: crystal violet + OH⁻ is first order in CV, even if noisy data fit another order better
+  if(o!==FIRST){
+    $("orderStatus").innerHTML="<span class='warn'>Not quite.</span> Look at the plots and residuals: which transformation should give a straight line with randomly scattered residuals? If none looks good, your data may be noisy. Try trimming the start or end with the fit window or minimum absorbance in Part 1, or exclude a poor trial.";return;
+  }
+  const poor=avgR[1]<Math.max(...avgR)-1e-9||avgR[1]<0.95;
+  selOrder=o;
+  document.querySelectorAll("#ordBtns button").forEach((b,i)=>b.classList.toggle("selected",i===o));
+  $("orderStatus").innerHTML="<b style='color:#0a7a3b'>✓ Correct: "+ORD[o]+" order.</b> Now analyze each trial."+(poor?" <span class='warn'>Note: your data fit this order less well than expected, likely from noise. Trimming the fit window or excluding a poor trial can improve it.</span>":"");
+  answers.push({label:"Order in crystal violet",guess:ORD[o],truth:ORD[o]});
+  runAnalysis();
+}
+
+// ---------- Part 3-4 ----------
+function runAnalysis(){
+  if(selOrder===null)return;
+  resetOut();results=[];
+  Object.keys(chartArgs).forEach(k=>{if(k.startsWith("trialChart"))delete chartArgs[k];});
+  const box=$("individualCharts");box.innerHTML="";
+  const conv=!!EL(),ku=units(selOrder,conv,0);
+  $("chosenOrder").innerHTML="<strong>Selected order:</strong> "+ORD[selOrder]+"<br><strong>Transformed variable:</strong> "+axisLabel(selOrder)+"<br><strong>k observed units:</strong> "+ku;
+  $("thK").innerHTML="k observed<br>("+ku+")";
+
+  trials.forEach((tr,i)=>{
+    if(!tr.include)return;
+    const pts=transform(getData(tr),selOrder),r=regression(pts),kc=kCalc(r.m,r.seM,selOrder);
+    results.push({trial:tr.name,number:tr.number,n:pts.length,slope:r.m,seM:r.seM,intercept:r.b,seB:r.seB,r2:r.r2,k:kc.k,kSE:kc.se});
+    const warn=pts.length<10?"<br><span class='warn'>⚠ Few data points in fit window</span>":!(kc.k>0)?"<br><span class='warn'>⚠ k ≤ 0: check order and fit window</span>":"";
+    const d=document.createElement("div");d.className="chart-box";
+    d.innerHTML=`<div class="chart-title">${tr.name}</div><canvas id="trialChart${i}"></canvas><div class="chart-info">y = ${format(r.m)}x ${r.b<0?"−":"+"} ${format(Math.abs(r.b))}<br>R² = ${format(r.r2,5)}</div>`;
+    box.appendChild(d);
+    drawChart("trialChart"+i,pts,r,axisLabel(selOrder),"Time (s)");
+  });
+
+  $("resultsTable").innerHTML=results.map(r=>`<tr><td>${r.trial}</td><td>${format(r.slope,5)}</td><td>${format(r.intercept,5)}</td><td>${sci(r.k)}</td></tr>`).join("");
+  renderOH();
+  $("analysisSection").classList.remove("hidden");buildK1();
+}
+
+function renderOH(){
+  $("thK2").innerHTML="k observed<br>("+units(selOrder,!!EL(),0)+")";
+  const tb=$("ohTable");tb.innerHTML="";
+  trials.forEach(tr=>{
+    const r=results.find(x=>x.number===tr.number),row=document.createElement("tr");
+    row.innerHTML=`<td>${tr.name}</td><td>${tr.include&&r?"Yes":"No"}</td><td><input type="number" step="any" min="0" aria-label="${tr.name} hydroxide concentration"></td><td>${r&&r.k>0?format(r.k,5):"—"}</td>`;
+    const inp=row.querySelector("input");inp.value=tr.oh;inp.oninput=()=>{tr.oh=inp.value;};inp.onchange=computeOH;
+    tb.appendChild(row);
+  });
+}
+
+// clear anything derived from the OH- analysis so stale values never persist
+function resetOut(){
+  ohRes=null;resetCold();$("cpK1").innerHTML=$("cpOH").innerHTML="";
+  ["ohResult","final"].forEach(id=>$(id).classList.add("hidden"));
+  $("ohInfo").textContent="";delete chartArgs.ohChart;
+  const c=$("ohChart");c.getContext("2d").clearRect(0,0,c.width,c.height);
+}
+
+// ---------- guided checkpoints ----------
+function cp(host,label,truthFn,tol,rel,hint,onPass){
+  const d=document.createElement("div");d.className="result";
+  d.innerHTML='<b>'+label+'</b><br><input type="number" step="any" style="width:160px"> <button>Check</button> <span class="fb"></span>';
+  const inp=d.querySelector("input"),btn=d.querySelector("button"),fb=d.querySelector(".fb");
+  btn.onclick=()=>{
+    const g=Number(inp.value),t=truthFn();
+    if(inp.value===""||!Number.isFinite(t)){fb.innerHTML="<span class='warn'>Enter a number (and complete the inputs above) first.</span>";return;}
+    const ok=rel?Math.abs(g-t)<=tol*Math.abs(t):Math.abs(g-t)<=tol;
+    if(!ok){fb.innerHTML="<span class='warn'>Not quite.</span> "+(rel&&Math.abs(g+t)<=tol*Math.abs(t)?"Check the sign. ":"")+hint;return;}
+    answers.push({label:label.replace(/<[^>]+>/g,""),guess:g,truth:t});
+    inp.disabled=btn.disabled=true;
+    fb.innerHTML="<b style='color:#0a7a3b'>✓ Correct!</b> Computed value: <b>"+format(t,4)+"</b>";
+    onPass(t);
+  };
+  host.appendChild(d);
+}
+function buildK1(){
+  const r=results[0];if(!r)return;
+  cp($("cpK1"),"Using the slope of the fit for "+r.trial+", calculate k observed ("+units(selOrder,!!EL(),0)+").",()=>results[0].k,TOL.k,true,
+    "k = −slope for zero and first order, +slope for second order. If you entered ε·l, convert the units with it.",
+    ()=>{["resultsSection","hydroxideSection"].forEach(id=>$(id).classList.remove("hidden"));computeOH();buildOHcp();});
+}
+function buildOHcp(){
+  const h=$("cpOH");h.innerHTML="";
+  cp(h,"Using your ln(k observed) vs. ln[OH⁻] plot, what is the reaction order in OH⁻?",()=>ohRes&&ohRes.m,TOL.order,false,
+    "Compare the line to ln(k_obs) = n·ln[OH⁻] + ln k. Which quantity is the slope?",
+    ()=>{
+      document.querySelectorAll("#ohTable input").forEach(i=>i.disabled=true);revealOH(1);
+      cp(h,"The y-intercept of your plot is ln k. Convert it to the actual rate constant, k, using the exponential function (eˣ). Enter k ("+units(selOrder,!!EL(),ohRes.nOH)+").",()=>ohRes.kMean,TOL.k,true,
+        "k = e^(intercept). Make sure you used the intercept, not the slope, of the ln(k observed) vs. ln[OH⁻] line.",
+        ()=>{revealOH(2);
+          const fin=()=>{revealOH(3);["coldSection","exportSection"].forEach(id=>$(id).classList.remove("hidden"));};
+          cp(h,"Now state the rate law. What is the reaction order in crystal violet?",()=>selOrder,0.25,false,"Which order did you determine in Part 2?",()=>
+            cp(h,"What is the reaction order in OH⁻ that you will use in the rate law?",()=>ohRes.nOH,0.25,false,"Use the order in OH⁻ that you were just given.",()=>
+              cp(h,"What is the overall reaction order?",()=>selOrder+ohRes.nOH,0.25,false,"Add the orders of crystal violet and OH⁻.",fin)));
+        });
+    });
+}
+// silent calculation: the checkpoints and later parts use these computed values
+function computeOH(){
+  ohRes=null;delete chartArgs.ohChart;
+  const c=$("ohChart");c.getContext("2d").clearRect(0,0,c.width,c.height);$("ohInfo").textContent="";$("ohErr").innerHTML="";
+  const entered=trials.filter(t=>t.include&&t.oh!=="").map(t=>Number(t.oh));
+  const OK=[0.025,0.020,0.015,0.010,0.005];
+  if(entered.some(o=>!OK.some(v=>Math.abs(o/v-1)<0.02))){
+    $("ohErr").innerHTML="⚠ Rethink these [OH⁻] values. One or more do not match the concentrations of OH⁻ in the reaction mixtures for this experiment. Think about the concentration after the solutions are combined, then re-enter your values to continue.";return;}
+  const pts=[],excl=[];
+  trials.forEach(tr=>{
+    if(!tr.include)return;
+    const r=results.find(x=>x.number===tr.number),oh=Number(tr.oh);
+    if(tr.oh===""||!(oh>0)||!r||!(r.k>0)){excl.push(tr.name);return;}
+    pts.push({x:Math.log(oh),y:Math.log(r.k),oh,k:r.k});
+  });
+  if(pts.length<2){$("ohInfo").textContent="Enter [OH⁻] for at least two trials.";return;}
+  const reg=regression(pts);
+  if(!Number.isFinite(reg.m)){$("ohInfo").textContent="The plot needs at least two different [OH⁻] values.";return;}
+  const ci=tcrit(pts.length-2)*reg.seM,nOH=1; // real order in OH⁻ is 1, regardless of the student's fitted slope;
+  const kMean=Math.exp(reg.b),kSD=kMean*reg.seB;
+  const warns=[];
+  if(pts.length<3)warns.push("Only "+pts.length+" points: R² is not meaningful. Use at least 3 [OH⁻] values.");
+  const cv=num("cv");
+  if(cv>0&&Math.min(...pts.map(p=>p.oh))/cv<10)warns.push("[OH⁻] is less than 10× [CV] in at least one trial, so the pseudo-order assumption may not hold.");
+  if(!cv)warns.push("[CV] was not entered, so the [OH⁻] ≫ [CV] assumption was not checked.");
+  if(excl.length)warns.push("Not included (missing/invalid values): "+excl.join(", ")+".");
+  ohRes={m:reg.m,b:reg.b,r2:reg.r2,seM:reg.seM,seB:reg.seB,ci,nOH,kMean,kSD,n:pts.length,pts,reg,warns};
+  drawChart("ohChart",pts,reg,"ln(k observed)","ln[OH⁻]");
+  $("ohInfo").innerHTML="y = "+format(reg.m,4)+"x "+(reg.b<0?"− ":"+ ")+format(Math.abs(reg.b),4)+"<br>R² = "+format(reg.r2,5);
+}
+function revealOH(st){
+  const o=ohRes,conv=!!EL(),kU=units(selOrder,conv,o.nOH);
+  let h="<strong>Fitted OH⁻ order (slope):</strong> "+pm(o.m,o.seM)+"<br><strong>Intercept (ln k):</strong> "+pm(o.b,o.seB)+"<br><strong>Order used in the rate law:</strong> "+o.nOH+"<br><em>The real order of this reaction in OH⁻ is 1. Small differences between your slope ("+format(o.m,3)+") and 1 come from experimental error, so use 1 from here on.</em>";
+  if(st>1)h+="<br><strong>k = e<sup>intercept</sup>:</strong> "+format(o.kMean,5)+" "+kU;
+  if(o.warns.length)h+="<br><br>"+o.warns.map(w=>"<span class='warn'>⚠ "+w+"</span>").join("<br>");
+  $("ohResult").innerHTML=h;$("ohResult").classList.remove("hidden");
+  if(st<3)return;
+  const pw=e=>e===1?"":"<sup>"+e+"</sup>",x=selOrder,y=o.nOH;
+  $("final").classList.remove("hidden");
+  $("finalLaw").innerHTML="<strong>Rate law:</strong> Rate = k"+(x?"[CV]"+pw(x):"")+(y?"[OH⁻]"+pw(y):"")+"<br><strong>Order in CV:</strong> "+x+" &nbsp;|&nbsp; <strong>Order in OH⁻:</strong> "+y+" &nbsp;|&nbsp; <strong>Overall order:</strong> "+(x+y);
+  $("finalK").innerHTML="<strong>Rate constant (k):</strong> "+format(o.kMean,4)+" "+kU;
+  $("finalNote").textContent=(!conv&&x!==1)?"k contains absorbance units (AU). Enter ε·l in Part 1 to convert to molar units.":"";
+}
+
+// ---------- charts ----------
+function niceTicks(lo,hi,n=5){
+  const raw=(hi-lo)/n,p=10**Math.floor(Math.log10(raw)),f=raw/p,step=(f<1.5?1:f<3?2:f<7?5:10)*p,a=[];
+  for(let v=Math.ceil(lo/step-1e-9)*step;v<=hi+step*1e-9;v+=step)a.push(+v.toPrecision(12));
+  return{a,step};
+}
+function fmtTick(v,step){
+  if(v===0)return"0";
+  const d=Math.max(0,-Math.floor(Math.log10(step)));
+  return(Math.abs(v)>=1e5||d>5)?v.toExponential(1):v.toFixed(d);
+}
+function drawChart(id,pts,reg,yl,xl){
+  chartArgs[id]=[pts,reg,yl,xl];
+  const c=$(id);if(!c)return;
+  paint(c,c.clientWidth||400,c.clientHeight||310,Math.max(window.devicePixelRatio||1,3),pts,reg,yl,xl);
+}
+function paint(c,W,H,r,pts,reg,yl,xl){
+  c.width=W*r;c.height=H*r;
+  const ctx=c.getContext("2d");ctx.setTransform(r,0,0,r,0,0);ctx.clearRect(0,0,W,H);
+  if(!pts.length)return;
+  const M={l:68,r:20,t:14,b:50},w=W-M.l-M.r,h=H-M.t-M.b;
+  const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y);
+  let x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  if(x0===x1){x0-=.5;x1+=.5;}if(y0===y1){y0-=.5;y1+=.5;}
+  const pad=(y1-y0)*.12;y0-=pad;y1+=pad;
+  const px=x=>M.l+(x-x0)/(x1-x0)*w,py=y=>M.t+h-(y-y0)/(y1-y0)*h;
+  const tx=niceTicks(x0,x1),ty=niceTicks(y0,y1);
+  ctx.strokeStyle="#dfe7eb";ctx.lineWidth=1;ctx.fillStyle="#526573";ctx.font="11px Arial";
+  ctx.textAlign="center";
+  tx.a.forEach(v=>{const x=px(v);ctx.beginPath();ctx.moveTo(x,M.t);ctx.lineTo(x,M.t+h);ctx.stroke();ctx.fillText(fmtTick(v,tx.step),x,M.t+h+16);});
+  ctx.textAlign="right";
+  ty.a.forEach(v=>{const y=py(v);ctx.beginPath();ctx.moveTo(M.l,y);ctx.lineTo(M.l+w,y);ctx.stroke();ctx.fillText(fmtTick(v,ty.step),M.l-8,y+4);});
+  ctx.fillStyle="#12334a";ctx.font="bold 13px Arial";ctx.textAlign="center";
+  ctx.fillText(xl,M.l+w/2,H-8);
+  ctx.save();ctx.translate(14,M.t+h/2);ctx.rotate(-Math.PI/2);ctx.fillText(yl,0,0);ctx.restore();
+  if(Number.isFinite(reg.m)){
+    ctx.beginPath();ctx.strokeStyle="#008b8b";ctx.lineWidth=2.5;
+    ctx.moveTo(px(x0),py(reg.m*x0+reg.b));ctx.lineTo(px(x1),py(reg.m*x1+reg.b));ctx.stroke();
+  }
+  ctx.fillStyle="#12334a";
+  pts.forEach(p=>{ctx.beginPath();ctx.arc(px(p.x),py(p.y),3,0,2*Math.PI);ctx.fill();});
+}
+let rz;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{
+  Object.keys(chartArgs).forEach(id=>{if($(id))drawChart(id,...chartArgs[id]);});},150);});
+
+// ---------- Part 6: low temperature / Ea ----------
+let cold=null;
+function resetCold(){
+  cold=null;$("coldResult").classList.add("hidden");
+  ["coldChart","coldRes"].forEach(id=>{delete chartArgs[id];const c=$(id);c.getContext("2d").clearRect(0,0,c.width,c.height);});
+}
+function addColdRow(t=""){
+  const r=document.createElement("tr");
+  r.innerHTML='<td><input type="number" step="any" min="0" aria-label="time"></td><td><input type="number" step="any" min="0" aria-label="absorbance"></td>';
+  const ins=r.querySelectorAll("input");ins[0].value=t;ins.forEach(i=>i.oninput=resetCold);
+  $("coldTable").appendChild(r);
+}
+function clearCold(){$("coldTable").innerHTML="";for(let i=0;i<=12;i++)addColdRow(i*60);resetCold();}
+clearCold();
+
+function calculateCold(){
+  if(selOrder===null||!ohRes){alert("Complete Parts 2–5 first: the Part 5 rate constant is needed for Eₐ.");return;}
+  const rows=[...$("coldTable").rows].map(r=>{const v=[...r.querySelectorAll("input")].map(i=>i.value);return{t:v[0],a:v[1]};})
+    .filter(r=>r.t!==""&&r.a!==""&&Number(r.a)>0).map(r=>({t:+r.t,a:+r.a})).sort((x,y)=>x.t-y.t);
+  const Tc=num("tCold"),Tr=num("tRoom"),oh=num("ohCold");
+  if(rows.length<3){alert("Enter at least 3 time/absorbance pairs (absorbance > 0).");return;}
+  if(Tc===null||Tr===null||!(oh>0)){alert("Enter both temperatures and the [OH⁻] used in the low-temperature run.");return;}
+  if(Tc===Tr){alert("The two temperatures must be different.");return;}
+
+  const pts=transform(rows,selOrder),reg=regression(pts),kc=kCalc(reg.m,reg.seM,selOrder);
+  if(!(kc.k>0)){alert("The fit gives k ≤ 0 for the selected order. Check the data.");return;}
+  const n=ohRes.nOH,k1=kc.k/Math.pow(oh,n),s1=kc.se/Math.pow(oh,n),k2=ohRes.kMean,s2=ohRes.kSD;
+  const T1=Tc+273.15,T2=Tr+273.15,R=8.314,d=1/T1-1/T2;
+  const Ea=R*Math.log(k2/k1)/d/1000;                       // kJ/mol
+  const rel=Math.hypot(Number.isFinite(s2)?s2/k2:0,Number.isFinite(s1)?s1/k1:0);
+  const sEa=R*rel/Math.abs(d)/1000;
+  const A=k2*Math.exp(Ea*1000/(R*T2));
+  const conv=!!EL(),kU=units(selOrder,conv,n);
+  const warns=[];
+  if(Ea<0)warns.push("Eₐ is negative: check which run was colder and that k increases with temperature.");
+  if(reg.r2<0.95)warns.push("Low R² for the low-temperature fit; check the data and the selected order.");
+  cold={pts,reg,rows,Ea,sEa,k1,s1,A,kU,Tc,Tr,oh,n,done:false,rev:[]};
+  cold.summary=format(Ea,4)+" kJ/mol";
+  cold.fit="<strong>Fit ("+ORD[selOrder]+" order):</strong> y = "+format(reg.m,5)+"x "+(reg.b<0?"− ":"+ ")+format(Math.abs(reg.b),5)+", R² = "+format(reg.r2,5);
+  $("coldResult").classList.remove("hidden");
+  $("coldResult").innerHTML="<div>"+cold.fit+'</div><div id="coldRev"></div><div id="cpCold"></div>';
+  const rev=h=>{cold.rev.push(h);$("coldRev").insertAdjacentHTML("beforeend",h);};
+  cp($("cpCold"),"Calculate k at "+Tc+" °C ("+kU+"), using [OH⁻] = "+oh+" M and the OH⁻ order from Part 5.",()=>k1,TOL.k,true,
+    "k = k observed / [OH⁻]ⁿ. Check the sign of the slope and the units.",()=>{
+      rev("<br><strong>k at "+Tc+" °C:</strong> "+format(k1,4)+" "+kU+"<br><strong>k at "+Tr+" °C</strong> (Part 5): "+format(k2,4)+" "+kU);
+      cp($("cpCold"),"Calculate the activation energy, Eₐ (kJ/mol).",()=>Ea,TOL.Ea,true,
+        "Eₐ = R·ln(k₂/k₁) / (1/T₁ − 1/T₂), with T in kelvin and R = 8.314 J mol⁻¹ K⁻¹. Convert J to kJ.",()=>{
+          rev("<br><strong>Activation energy, Eₐ:</strong> "+cold.summary+"<br><strong>Pre-exponential factor, A:</strong> "+format(A,3)+" "+kU+(warns.length?"<br>"+warns.map(w=>"<span class='warn'>⚠ "+w+"</span>").join("<br>"):""));
+          cold.done=true;
+        });
+    });
+  drawChart("coldChart",pts,reg,axisLabel(selOrder),"Time (s)");
+  drawChart("coldRes",pts.map(p=>({x:p.x,y:p.y-(reg.m*p.x+reg.b)})),{m:0,b:0},"Residual","Time (s)");
+}
+
+// ---------- report ----------
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function img(pts,reg,yl,xl,W=300,H=200){
+  const c=document.createElement("canvas");paint(c,W,H,6,pts,reg,yl,xl);
+  return '<img alt="'+yl+' vs '+xl+'" src="'+c.toDataURL("image/png")+'">';
+}
+function hideReport(){$("report").classList.add("hidden");document.querySelector(".container").classList.remove("hidden");}
+function showReport(){
+  if($("final").classList.contains("hidden")){alert("Complete Part 5 first.");return;}
+  const tr=curTrial(),name=$("stuName").value.trim();
+  const set=[["Fit start",$("tStart").value&&$("tStart").value+" s"],["Fit end",$("tEnd").value&&$("tEnd").value+" s"],["Min A",$("minA").value],["ε·l",$("el").value&&$("el").value+" M⁻¹"],["[CV]",$("cv").value&&$("cv").value+" M"]].filter(x=>x[1]).map(x=>x[0]+": "+x[1]).join(" | ")||"all data used";
+  const excl=trials.filter(t=>!t.include).map(t=>t.name).join(", ");
+  let h='<div class="noprint"><button class="secondary" onclick="hideReport()">← Back to analysis</button><button onclick="window.print()">Print / Save as PDF</button></div>';
+  h+='<h1>Crystal Violet + NaOH Kinetics Report</h1><div class="small">Name: <b>'+(esc(name)||"______________")+'</b> | Date: '+new Date().toLocaleDateString()+' | File: '+esc(fileName)+'<br>Settings: '+set+(excl?" | Excluded: "+excl:"")+'</div>';
+
+  h+='<div class="sec"><h2>1. Reaction Order in Crystal Violet</h2>'+$("r2Table").querySelector("table").outerHTML+'<div class="g3">'+
+    [0,1,2].map(o=>{const pts=transform(getData(tr),o),r=regression(pts);return"<div>"+img(pts,r,axisLabel(o),"Time (s)")+'<div class="cap">'+ORD[o]+" order, "+tr.name+" (R² = "+format(r.r2,4)+")</div></div>";}).join("")+
+    '</div><p><b>Selected order: '+ORD[selOrder]+'</b></p></div>';
+
+  h+='<div class="sec"><h2>2. Observed Rate Constants</h2><table>'+$("resultsSection").querySelector("table").innerHTML+'</table><div class="g3">'+
+    results.map(r=>{const pts=transform(getData(trials.find(t=>t.number===r.number)),selOrder),g=regression(pts);
+      return"<div>"+img(pts,g,axisLabel(selOrder),"Time (s)")+'<div class="cap">'+r.trial+": k obs = "+format(r.k,4)+"</div></div>";}).join("")+'</div></div>';
+
+  const rows=results.map(r=>{const t=trials.find(x=>x.number===r.number),o=Number(t.oh);
+    return o>0&&r.k>0?"<tr><td>"+r.trial+"</td><td>"+t.oh+"</td><td>"+format(r.k,4)+"</td><td>"+format(Math.log(o),4)+"</td><td>"+format(Math.log(r.k),4)+"</td></tr>":"";}).join("");
+  h+='<div class="sec"><h2>3. Reaction Order in Hydroxide</h2><table><thead><tr><th>Trial</th><th>[OH⁻] (M)</th><th>k observed</th><th>ln[OH⁻]</th><th>ln(k obs)</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+    '<div class="g2">'+img(ohRes.pts,ohRes.reg,"ln(k observed)","ln[OH⁻]",420,280)+'<div class="result" style="margin:0;font-size:9pt">'+$("ohResult").innerHTML+'</div></div></div>';
+
+  if(cold&&cold.done){
+    h+='<div class="sec"><h2>4. Temperature Dependence and Activation Energy</h2><table><tr><th>Time (s)</th>'+cold.rows.map(r=>"<td>"+r.t+"</td>").join("")+'</tr><tr><th>Absorbance</th>'+cold.rows.map(r=>"<td>"+r.a+"</td>").join("")+'</tr></table>'+
+      '<div class="g2">'+img(cold.pts,cold.reg,axisLabel(selOrder),"Time (s)",420,280)+'<div class="result" style="margin:0;font-size:9pt">'+cold.fit+cold.rev.join("")+'</div></div></div>';
+  }
+  h+='<div class="sec"><h2>'+(cold&&cold.done?5:4)+'. Final Results</h2><div class="result" style="font-size:11pt">'+$("finalLaw").innerHTML+'<br>'+$("finalK").innerHTML+(cold&&cold.done?'<br><strong>Activation energy (Eₐ):</strong> '+cold.summary:'')+'<div class="small">'+$("finalNote").textContent+'</div></div></div>';
+
+  h+='<div class="sec"><h2>Checkpoint Answers</h2><table><tr><th>Question</th><th>Your answer</th><th>Computed value</th></tr>'+answers.map(a=>"<tr><td style='text-align:left'>"+esc(a.label)+"</td><td>"+(typeof a.guess==="number"?format(a.guess,4):a.guess)+"</td><td>"+(typeof a.truth==="number"?format(a.truth,4):a.truth)+"</td></tr>").join("")+'</table></div>';
+  $("report").innerHTML=h;
+  document.querySelector(".container").classList.add("hidden");
+  $("report").classList.remove("hidden");window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>
